@@ -1,4 +1,4 @@
-# versions are default only, we upgrade in script
+# versions are default only, we upgrade in script. empty means unpinned version
 base:
   image: bash
   tag: 5.2.32-alpine3.20
@@ -8,7 +8,26 @@ scripts_dir: scripts
 cmd: ./hello.sh
 
 packages:
-  jq: 1.7.1-r0
-  git: 2.45.2-r0
-  curl: 8.9.1-r1
-  openssl: 3.3.2-r0
+  jq:
+  yq:
+  git:
+  curl:
+  openssl:
+  ca-certificates:
+  openssh-client:
+  coreutils:
+  grep:
+  sed:
+  gawk:
+  bind-tools:
+  netcat-openbsd:
+  iputils:
+  busybox-extras:
+  procps:
+  tzdata:
+  vim:
+  less:
+  tar:
+  unzip:
+  gettext:
+  shellcheck:
