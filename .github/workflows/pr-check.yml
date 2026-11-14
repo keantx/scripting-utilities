@@ -46,3 +46,7 @@ jobs:
       uses: astral-sh/ruff-action@v4.1.0
       with:
           version: "latest"
+    - name: Ruff check and format
+      run: |
+        ruff check --fix --exit-zero || echo "::warning::ruff found lint issues, see the step log"
+        ruff format || echo "::warning::Some Python files are not formatted"
