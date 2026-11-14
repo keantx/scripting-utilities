@@ -22,7 +22,9 @@ def http_get(url: str) -> bytes:
 
 def latest_base_tag(image: str, max_pages: int = 10) -> str:
     repo = image if "/" in image else f"library/{image}"
-    url = f"https://hub.docker.com/v2/repositories/{repo}/tags?page_size=100&name=alpine"
+    url = (
+        f"https://hub.docker.com/v2/repositories/{repo}/tags?page_size=100&name=alpine"
+    )
     best_key, best_tag = None, None
     for _ in range(max_pages):
         data = json.loads(http_get(url))
@@ -69,10 +71,17 @@ def load_index(branch: str, arch: str, mirror: str) -> dict:
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("-i", "--input", type=Path, default=REPO_ROOT / "image.yaml")
-    ap.add_argument("-o", "--output", type=Path, default=REPO_ROOT / "updated_image.yaml")
-    ap.add_argument("--arch", default="x86_64", help="apk architecture (x86_64, aarch64, ...)")
-    ap.add_argument("--keep-base", action="store_true",
-                    help="keep the current base tag and only update packages within its Alpine release")
+    ap.add_argument(
+        "-o", "--output", type=Path, default=REPO_ROOT / "updated_image.yaml"
+    )
+    ap.add_argument(
+        "--arch", default="x86_64", help="apk architecture (x86_64, aarch64, ...)"
+    )
+    ap.add_argument(
+        "--keep-base",
+        action="store_true",
+        help="keep the current base tag and only update packages within its Alpine release",
+    )
     ap.add_argument("--mirror", default="https://dl-cdn.alpinelinux.org/alpine")
     args = ap.parse_args()
 
@@ -91,7 +100,9 @@ def main():
             continue
         new = index.get(name)
         if not new:
-            print(f"  WARN {name}: not found in {branch}, keeping {old}", file=sys.stderr)
+            print(
+                f"  WARN {name}: not found in {branch}, keeping {old}", file=sys.stderr
+            )
             continue
         cfg["packages"][name] = new
         print(f"  {name}: {old} -> {new}" + ("" if old != new else "  (unchanged)"))
