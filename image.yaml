@@ -1,0 +1,14 @@
+# versions are default only, we upgrade in script
+base:
+  image: bash
+  tag: 5.2.32-alpine3.20
+
+workdir: /scripts
+scripts_dir: scripts
+cmd: ./hello.sh
+
+packages:
+  jq: 1.7.1-r0
+  git: 2.45.2-r0
+  curl: 8.9.1-r1
+  openssl: 3.3.2-r0
