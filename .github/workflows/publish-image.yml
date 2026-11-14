@@ -94,77 +94,83 @@ jobs:
             --title "${{ steps.version.outputs.tag }}" \
             --generate-notes
 
-  build:
-    runs-on: ubuntu-22.04
-    needs:
-      - release
-      - generate
-    strategy:
-      fail-fast: false
-      matrix:
-        platform:
-          - linux/amd64
-          - linux/arm/v6
-          - linux/arm/v7
-          - linux/arm64
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    build:
+      runs-on: ubuntu-22.04
+      needs:
+        - release
+        - generate
+      continue-on-error: ${{ matrix.experimental }}
+      timeout-minutes: 60
+      strategy:
+        fail-fast: false
+        matrix:
+          include:
+            - platform: linux/amd64
+              experimental: false
+            - platform: linux/arm64
+              experimental: false
+            - platform: linux/arm/v7
+              experimental: true
+            - platform: linux/arm/v6
+              experimental: true
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
 
-      - name: Download Dockerfile
-        uses: actions/download-artifact@v4
-        with:
-          name: dockerfile
-          path: .
+        - name: Download Dockerfile
+          uses: actions/download-artifact@v4
+          with:
+            name: dockerfile
+            path: .
 
-      - name: Prepare
-        run: |
-          platform=${{ matrix.platform }}
-          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
+        - name: Prepare
+          run: |
+            platform=${{ matrix.platform }}
+            echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ vars.REGISTRY_IMAGE }}
-          tags: |
-            type=semver,pattern={{raw}},value=${{ needs.release.outputs.tag }}
+        - name: Docker meta
+          id: meta
+          uses: docker/metadata-action@v5
+          with:
+            images: ${{ vars.REGISTRY_IMAGE }}
+            tags: |
+              type=semver,pattern={{raw}},value=${{ needs.release.outputs.tag }}
 
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        - name: Login to Docker Hub
+          uses: docker/login-action@v3
+          with:
+            username: ${{ vars.DOCKERHUB_USERNAME }}
+            password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        - name: Set up QEMU
+          uses: docker/setup-qemu-action@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        - name: Set up Docker Buildx
+          uses: docker/setup-buildx-action@v3
 
-      - name: Build and push by digest
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: ${{ matrix.platform }}
-          labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ vars.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+        - name: Build and push by digest
+          id: build
+          uses: docker/build-push-action@v6
+          with:
+            context: .
+            file: ./Dockerfile
+            platforms: ${{ matrix.platform }}
+            labels: ${{ steps.meta.outputs.labels }}
+            outputs: type=image,name=${{ vars.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
+        - name: Export digest
+          run: |
+            mkdir -p /tmp/digests
+            digest="${{ steps.build.outputs.digest }}"
+            touch "/tmp/digests/${digest#sha256:}"
 
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ env.PLATFORM_PAIR }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
+        - name: Upload digest
+          uses: actions/upload-artifact@v4
+          with:
+            name: digests-${{ env.PLATFORM_PAIR }}
+            path: /tmp/digests/*
+            if-no-files-found: error
+            retention-days: 1
 
   merge:
     runs-on: ubuntu-22.04
