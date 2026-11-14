@@ -96,16 +96,28 @@ def main():
     index = load_index(branch, args.arch, args.mirror)
 
     for name, old in cfg["packages"].items():
-        if old is None:  # unpinned stays unpinned
-            continue
-        new = index.get(name)
-        if not new:
-            print(
-                f"  WARN {name}: not found in {branch}, keeping {old}", file=sys.stderr
-            )
-            continue
-        cfg["packages"][name] = new
-        print(f"  {name}: {old} -> {new}" + ("" if old != new else "  (unchanged)"))
+        newest = index.get(name)
+        if old is None:
+            if not newest:
+                print(
+                    f"  WARN {name}: not found in {branch}, leaving unpinned",
+                    file=sys.stderr,
+                )
+                continue
+            cfg["packages"][name] = newest
+            print(f"  {name}: (unpinned) -> {newest}  [resolved to newest]")
+        else:
+            old = str(old)
+            cfg["packages"][name] = old
+            if not newest:
+                print(
+                    f"  WARN {name}: not found in {branch}, keeping pinned {old}",
+                    file=sys.stderr,
+                )
+            elif newest == old:
+                print(f"  {name}: {old} -> {old}  [pinned, already newest]")
+            else:
+                print(f"  {name}: {old} -> {old}  [pinned, kept; newest is {newest}]")
 
     args.output.write_text(HEADER + yaml.safe_dump(cfg, sort_keys=False))
     print(f"Wrote {args.output}")
