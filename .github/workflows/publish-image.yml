@@ -22,6 +22,15 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Generate requirements.txt
+        run: |
+          pip install pipreqs
+          pipreqs scripts/ --savepath requirements.txt --mode no-pin --force
+          cat requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
       - name: Check tool versions
         run: python scripts/helper/tool_version_checker.py
 
