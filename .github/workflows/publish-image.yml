@@ -1,16 +1,97 @@
 name: Publish Dockerhub
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
-    # branches:
-    #   - main
-    # workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. v1.2.3). Leave empty to auto-increment the patch of the latest tag'
+        required: false
+        type: string
 
 jobs:
+  release:
+      runs-on: ubuntu-22.04
+      permissions:
+        contents: write
+      outputs:
+        tag: ${{ steps.version.outputs.tag }}
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+            fetch-tags: true
+
+        - name: Determine version
+          id: version
+          env:
+            INPUT_VERSION: ${{ inputs.version }}
+          run: |
+            if [ -n "$INPUT_VERSION" ]; then
+              tag="v${INPUT_VERSION#v}"
+              if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo "Invalid version '$INPUT_VERSION', expected format vX.Y.Z"
+                exit 1
+              fi
+            else
+              latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
+              latest=${latest:-v0.0.0}
+              IFS=. read -r major minor patch <<< "${latest#v}"
+              tag="v${major}.${minor}.$((patch + 1))"
+            fi
+
+            if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+              echo "Tag $tag already exists"
+              exit 1
+            fi
+
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+        - name: Create release
+          env:
+            GH_TOKEN: ${{ github.token }}
+          run: |
+            gh release create "${{ steps.version.outputs.tag }}" \
+              --target "${{ github.sha }}" \
+              --title "${{ steps.version.outputs.tag }}" \
+              --generate-notes
+
+  generate:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Remove or adjust if the scripts only use the standard library
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check tool versions
+        run: python tool_version_checker.py
+
+      - name: Render Dockerfile
+        run: python render.py
+
+      - name: Upload Dockerfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockerfile
+          path: Dockerfile
+          if-no-files-found: error
+          retention-days: 1
+
   build:
     runs-on: ubuntu-22.04
+    needs:
+      - release
+      - generate
     strategy:
       fail-fast: false
       matrix:
@@ -20,6 +101,15 @@ jobs:
           - linux/arm/v7
           - linux/arm64
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Dockerfile
+        uses: actions/download-artifact@v4
+        with:
+          name: dockerfile
+          path: .
+
       - name: Prepare
         run: |
           platform=${{ matrix.platform }}
@@ -30,6 +120,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ vars.REGISTRY_IMAGE }}
+          tags: |
+            type=semver,pattern={{raw}},value=${{ needs.release.outputs.tag }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -47,6 +139,8 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
+          context: .
+          file: ./Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ vars.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
@@ -68,6 +162,7 @@ jobs:
   merge:
     runs-on: ubuntu-22.04
     needs:
+      - release
       - build
     steps:
       - name: Download digests
@@ -85,6 +180,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ vars.REGISTRY_IMAGE }}
+          tags: |
+            type=semver,pattern={{raw}},value=${{ needs.release.outputs.tag }}
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
