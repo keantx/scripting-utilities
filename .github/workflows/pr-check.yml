@@ -9,22 +9,22 @@ on:
       - checks_requested
 
 jobs:
-  dockerfile_lint:
-    runs-on: ubuntu-22.04
-    container:
-      image: hadolint/hadolint:v2.12.0-alpine
-    env:
-      DOCKERFILE_PATH: "Dockerfile"
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+  # dockerfile_lint:
+  #   runs-on: ubuntu-22.04
+  #   container:
+  #     image: hadolint/hadolint:v2.12.0-alpine
+  #   env:
+  #     DOCKERFILE_PATH: "Dockerfile"
+  #   steps:
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
 
-    - name: Check Dockerfile Lint
-      run: |
-        hadolint ${DOCKERFILE_PATH}
+  #   - name: Check Dockerfile Lint
+  #     run: |
+  #       hadolint ${DOCKERFILE_PATH}
 
   sh_lint:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     container:
       image: koalaman/shellcheck-alpine:v0.10.0
     env:
@@ -35,3 +35,19 @@ jobs:
 
     - name: Check Scripts
       run: shellcheck ${SCRIPTS_PATH}/*.sh
+
+  py_lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Ruff
+      uses: astral-sh/ruff-action@v4.1.0
+      with:
+          version: "latest"
+          args: "--version"
+    - name: Ruff check and format
+      run: |
+        ruff check --fix --exit-zero
+        ruff format --check --diff

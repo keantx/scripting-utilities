@@ -1,0 +1,12 @@
+FROM {{ base.image }}:{{ base.tag }}
+
+RUN mkdir {{ workdir }}
+COPY {{ scripts_dir }}/* {{ workdir }}/
+
+WORKDIR {{ workdir }}
+
+RUN chmod +x {{ workdir }}/* && \
+    apk add --no-cache \
+    {{ apk_packages }}
+
+CMD [ "{{ cmd }}" ]
