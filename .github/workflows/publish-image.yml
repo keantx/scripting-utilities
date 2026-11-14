@@ -69,10 +69,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Remove or adjust if the scripts only use the standard library
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
       - name: Check tool versions
         run: python tool_version_checker.py
 
